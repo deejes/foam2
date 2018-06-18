@@ -80,6 +80,18 @@ foam.CLASS({
     {
       class: 'Boolean',
       name: 'emailIsEnabled'
+    },
+    {
+      class: 'Boolean',
+      name: 'slackIsEnabled'
+    },
+    {
+      class: 'String',
+      name: 'slackWebhook'
+    },
+    {
+      class: 'String',
+      name: 'slackMessage'
     }
   ]
 });
