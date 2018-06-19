@@ -83,7 +83,7 @@ foam.CLASS({
     },
     {
       class: 'Boolean',
-      name: 'slackIsEnabled'
+      name: 'sendSlackMessage'
     },
     {
       class: 'String',
