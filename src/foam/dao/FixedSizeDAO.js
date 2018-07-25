@@ -13,6 +13,7 @@ foam.CLASS({
 
   javaImports: [
     'foam.dao.Sink',
+    'foam.core.FObject',
     'org.apache.commons.collections.buffer.CircularFifoBuffer',
     'org.apache.commons.collections.Buffer',
     'org.apache.commons.collections.BufferUtils'
@@ -64,6 +65,14 @@ for ( int i = 0; i < arrayObject.length; i++ ) {
 decorated.eof();
 return sink;
 `
+    },
+    
+      function find_(x, id) {
+        console.log('looking for meessage in the fixedsizeDAO')
+        debugger;
+        return this.primary.find_(x, id).then(function(o) {
+          return o || self.delegate.find_(x, id);
+        });
     }
   ]
 });

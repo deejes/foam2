@@ -8,7 +8,7 @@ foam.CLASS({
   package: 'foam.nanos.logger',
   name: 'LogMessage',
 
-  documentation: `Modelled log output.
+  documentation: `Modelled log output
 Implement LastModifiedByAware to suppress 'modified by' comment in journal output.`,
 
   implements: [
@@ -18,7 +18,8 @@ Implement LastModifiedByAware to suppress 'modified by' comment in journal outpu
   ],
 
   searchColumns: [
-    'severity'
+    'severity',
+    'message'
    ],
 
   properties: [
@@ -56,16 +57,26 @@ Implement LastModifiedByAware to suppress 'modified by' comment in journal outpu
       name: 'message',
       class: 'String',
       label: 'Log Message',
-      visibility: foam.u2.Visibility.RO      
+      visibility: foam.u2.Visibility.RO,
+      view: {
+        class: 'foam.u2.tag.TextArea',
+        rows: 12, cols: 80,
+        css: { 'font-family': 'monospace' }
+      },
+      //searchView: {
+        //class: 'foam.u2.search.TextSearchView',
+        //of: 'foam.nanos.logger.LogMessage.message',
+        //richSearch: true
+      //}
     },
     // TODO: implement via an additional method on Logger logger.flag(x, y).log(message)
     // {
     //   name: 'flags',
     //   class: 'Map'
     // },
-    {
-      name: 'exception',
-      class: 'Object'
-    }
+    //{
+   //   name: 'exception',
+   //   class: 'Object'
+   // }
   ]
 });

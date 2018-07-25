@@ -35,7 +35,11 @@ foam.CLASS({
       view: { class: 'foam.u2.DetailView', showActions: true },
       factory: function() {
         var self = this;
+        console.log(this.dao);
+        console.log(this.data);
+        // debugger;
         this.dao.find(this.data).then(function(obj) {
+          console.log(obj);
           self.obj = obj.clone();
         });
         return null;

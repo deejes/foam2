@@ -90,6 +90,7 @@ foam.CLASS({
 
   methods: [
     function initE() {
+    console.log("hello from init!");
       var self = this;
 
       this.dao.on.sub(this.updateTotalCount);

@@ -126,7 +126,7 @@ foam.CLASS({
     {
       name: 'updateViews',
       isMerged: true,
-      mergeDelay: 20,
+      mergeDelay: 5000,
       code: function() {
         // Deliberately a longer delay than onViewUpdate, since updating the
         // views is less important.
