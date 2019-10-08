@@ -105,7 +105,7 @@ foam.CLASS({
         var result = {};
         for ( i =0; i < referenceObjectsArray.length; i++ ) {
             if ( this.setOfReferenceIds.has(referenceObjectsArray[i].instance_.id) ) {
-              result[referenceObjectsArray[i].instance_.id] = referenceObjectsArray[i].legalName;
+              result[referenceObjectsArray[i].instance_.id] = referenceObjectsArray[i].toSummary();
             }
           }
         return result;
