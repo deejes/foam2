@@ -21,24 +21,47 @@ foam.CLASS({
   documentation: 'FOAM class that models a Cron script',
 
   tableColumns: [
-    'id', 'enabled', 'server', 'description', 'lastDuration', 'status', 'run'
+    'id', 'enabled', 'description', 'lastDuration', 'status', 'scheduledTime', 'run'
   ],
 
   searchColumns: ['id', 'description'],
 
+  sections: [
+    {
+      name: 'scheduling',
+      isAvailable: function(id) { return !! id; },
+      order: 2
+    },
+    {
+      name: '_defaultSection',
+      order: 1
+    }
+  ],
+
   properties: [
     {
+      name: 'server',
+      hidden: true,
+      value: true
+    },
+    {
+      name: 'schedule',
       class: 'FObjectProperty',
       of: 'foam.nanos.cron.Schedule',
       name: 'schedule',
-      hidden: true,
+      view: {
+        class: 'foam.u2.view.FObjectView',
+        of: 'foam.nanos.cron.Schedule'
+      },
+      section: 'scheduling',
       javaFactory: `return new CronSchedule.Builder(getX()).build();`
     },
     {
       class: 'DateTime',
       name: 'scheduledTime',
       documentation: `Scheduled time to run Cron script.`,
-      hidden: true,
+      section: 'scheduling',
+      visibility: 'RO',
       javaFactory: 'return getNextScheduledTime();'
     },
     {
@@ -61,15 +84,24 @@ foam.CLASS({
       javaCode:
 `DAO notification = (DAO) x.get("notificationDAO");
 
+/*
+  I don't know why we're doing this because we aren't specifying a user or
+  group to be notified and we aren't including the script output either.
+  Also, if we were to notify, we should use a ScriptRunNotification rather
+  than a generic notification. Maybe there should be properties to say which
+  users or groups to notify, or if notifications should be sent or not (and
+  their expiry).
 Notification cronStartNotify = new Notification();
 cronStartNotify.setBody("Cron STARTED - " + this.getId() + " " + this.getDescription());
 notification.put(cronStartNotify);
-
+*/
 super.runScript(x);
 
+/*
 Notification cronEndNotify = new Notification();
 cronEndNotify.setBody("Cron ENDED - " + this.getId() + " " + this.getDescription());
 notification.put(cronEndNotify);
+*/
 
 setScheduledTime(getNextScheduledTime());`
     },

@@ -49,7 +49,11 @@ foam.CLASS({
     },
     {
       class: 'Boolean',
-      name: 'permissionRequired'
+      name: 'readPermissionRequired'
+    },
+    {
+      class: 'Boolean',
+      name: 'writePermissionRequired'
     },
     {
       class: 'Boolean',
@@ -217,10 +221,16 @@ foam.CLASS({
             body: 'return ' + this.networkTransient + ';'
           },
           {
-            name: 'getPermissionRequired',
+            name: 'getReadPermissionRequired',
             type: 'boolean',
             visibility: 'public',
-            body: 'return ' + this.permissionRequired + ';'
+            body: 'return ' + this.readPermissionRequired + ';'
+          },
+          {
+            name: 'getWritePermissionRequired',
+            type: 'boolean',
+            visibility: 'public',
+            body: 'return ' + this.writePermissionRequired + ';'
           },
           {
             name: 'getStorageTransient',
@@ -262,7 +272,7 @@ foam.CLASS({
             name: 'createStatement',
             visibility: 'public',
             type: 'String',
-            body: 'return "' + this.propName.toLowerCase() + '";'
+            body: 'return getName();'
           },
           {
             name: 'isSet',
@@ -287,7 +297,7 @@ foam.CLASS({
               { name: 'x', type: 'foam.core.X' },
               { name: 'obj', type: 'foam.core.FObject' }
             ],
-            body: this.validateObj
+            body: this.validateObj || '/* Template Method: override in subclass if required. */'
           },
           {
             name: 'toCSV',

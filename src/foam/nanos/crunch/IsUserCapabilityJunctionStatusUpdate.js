@@ -3,6 +3,7 @@
  * Copyright 2019 The FOAM Authors. All Rights Reserved.
  * http://www.apache.org/licenses/LICENSE-2.0
  */
+
 foam.CLASS({
   package: 'foam.nanos.crunch',
   name: 'IsUserCapabilityJunctionStatusUpdate',
@@ -24,10 +25,7 @@ foam.CLASS({
       javaCode: `
         return OR(
           EQ(OLD_OBJ, null),
-          AND(
-            NEQ(DOT(OLD_OBJ, UserCapabilityJunction.STATUS), DOT(NEW_OBJ, UserCapabilityJunction.STATUS)),
-            NEQ(DOT(NEW_OBJ, UserCapabilityJunction.STATUS), CapabilityJunctionStatus.GRANTED)
-          )
+          NEQ(DOT(OLD_OBJ, UserCapabilityJunction.STATUS), DOT(NEW_OBJ, UserCapabilityJunction.STATUS))
         ).f(obj);
       `
     }

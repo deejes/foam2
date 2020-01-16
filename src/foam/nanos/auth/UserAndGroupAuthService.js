@@ -39,6 +39,7 @@ foam.CLASS({
     'foam.util.Password',
     'foam.util.SafetyUtil',
 
+    'java.security.Permission',
     'java.util.Calendar',
     'java.util.regex.Pattern',
     'javax.security.auth.AuthPermission',
@@ -48,16 +49,6 @@ foam.CLASS({
   ],
 
   constants: [
-    {
-      name: 'PASSWORD_VALIDATE_REGEX',
-      type: 'String',
-      value: '^.{6,}$'
-    },
-    {
-      name: 'PASSWORD_VALIDATION_ERROR_MESSAGE',
-      type: 'String',
-      value: 'Password must be at least 6 characters long.'
-    },
     {
       name: 'CHECK_USER_PERMISSION',
       type: 'String',
@@ -74,7 +65,7 @@ foam.CLASS({
       name: 'getCurrentUser',
       javaCode: `
         Session session = x.get(Session.class);
-        
+
         // fetch context and check if not null or user id is 0
         if ( session == null || session.getUserId() == 0 ) {
           throw new AuthenticationException("Not logged in");
@@ -160,7 +151,8 @@ foam.CLASS({
 
         Session session = x.get(Session.class);
         session.setUserId(user.getId());
-        session.setContext(session.getContext().put("user", user).put("group", group));
+        ((DAO) getLocalSessionDAO()).inX(x).put(session);
+        session.setContext(session.applyTo(session.getContext()));
 
         return user;
       `
@@ -194,7 +186,7 @@ foam.CLASS({
       `
     },
     {
-      name: 'checkUserPermission',
+      name: 'checkUser',
       documentation: `Checks if the user passed into the method has the passed
         in permission attributed to it by checking their group. No check on User
         and group enabled flags.`,
@@ -214,7 +206,7 @@ foam.CLASS({
             if ( group == null ) break;
 
             // check permission
-            if ( group.implies(x, permission) ) return true;
+            if ( group.implies(x, new AuthPermission(permission)) ) return true;
 
             // check parent group
             groupId = group.getParent();
@@ -232,7 +224,7 @@ foam.CLASS({
       javaCode: `
         if ( x == null || permission == null ) return false;
 
-        java.security.Permission p = new AuthPermission(permission);
+        Permission p = new AuthPermission(permission);
 
         try {
           Group group = getCurrentGroup(x);
@@ -257,15 +249,34 @@ foam.CLASS({
     {
       name: 'validatePassword',
       javaCode: `
-        if ( SafetyUtil.isEmpty(potentialPassword) || ! (Pattern.compile(PASSWORD_VALIDATE_REGEX)).matcher(potentialPassword).matches() ) {
-          throw new RuntimeException(PASSWORD_VALIDATION_ERROR_MESSAGE);
+        // Password policy to validate against
+        PasswordPolicy passwordPolicy = null;
+
+        // Retrieve the logger
+        Logger logger = (Logger) x.get("logger");
+
+        // Retrieve the password policy from the user and group when available
+        if ( user != null ) {
+          Group ancestor = (Group) x.get("group");
+          if ( ancestor != null ) {
+            // Check password policy
+            passwordPolicy = ancestor.getPasswordPolicy();
+            while ( passwordPolicy == null || ! passwordPolicy.getEnabled() ) {
+              ancestor = ancestor.getAncestor(x, ancestor);
+              if ( ancestor == null ) break;
+              passwordPolicy = ancestor.getPasswordPolicy();
+            }
+          }
         }
-      `
-    },
-    {
-      name: 'checkUser',
-      javaCode: `
-        return checkUserPermission(x, user, new AuthPermission(permission));
+
+        // Use the default password policy if nothing is found
+        if ( passwordPolicy == null || ! passwordPolicy.getEnabled() ) {
+          passwordPolicy = new PasswordPolicy();
+          passwordPolicy.setEnabled(true);
+        }
+
+        // Validate the password against the password policy
+        passwordPolicy.validate(user, potentialPassword);
       `
     },
     {
@@ -304,7 +315,7 @@ foam.CLASS({
         }
 
         // check if password is valid per validatePassword method
-        validatePassword(newPassword);
+        validatePassword(x, user, newPassword);
 
         // old password does not match
         if ( ! Password.verify(oldPassword, user.getPassword()) ) {
@@ -358,7 +369,7 @@ foam.CLASS({
           throw new AuthenticationException("Password is required for creating a user");
         }
 
-        validatePassword(user.getPassword());
+        validatePassword(x, user, user.getPassword());
       `
     },
     {
@@ -390,7 +401,7 @@ foam.CLASS({
         if ( user != null ) {
           if ( agent != null ) {
             DAO agentJunctionDAO = (DAO) x.get("agentJunctionDAO");
-            UserUserJunction junction = (UserUserJunction) agentJunctionDAO.inX(x).find(
+            UserUserJunction junction = (UserUserJunction) agentJunctionDAO.find(
               AND(
                 EQ(UserUserJunction.SOURCE_ID, agent.getId()),
                 EQ(UserUserJunction.TARGET_ID, user.getId())
@@ -406,7 +417,7 @@ foam.CLASS({
 
           // Third highest precedence: If a user is logged in but not acting as
           // another user, return their group.
-          return user.findGroup(x);
+          return (Group) ((DAO) getLocalGroupDAO()).inX(x).find(user.getGroup());
         }
 
         // If none of the cases above match, return null.

@@ -13,11 +13,14 @@ foam.CLASS({
     'foam.nanos.auth.CreatedAware',
     'foam.nanos.auth.EnabledAware',
     'foam.nanos.auth.HumanNameTrait',
-    'foam.nanos.auth.LastModifiedAware'
+    'foam.nanos.auth.LastModifiedAware',
+    'foam.nanos.auth.ServiceProviderAware',
+    'foam.nanos.notification.Notifiable'
   ],
 
   requires: [
     'foam.nanos.auth.Address',
+    'foam.nanos.auth.PriorPassword',
     'foam.nanos.auth.Phone'
   ],
 
@@ -26,11 +29,16 @@ foam.CLASS({
     'foam.core.X',
     'foam.dao.DAO',
     'foam.dao.ProxyDAO',
+    'foam.dao.ArraySink',
     'foam.dao.Sink',
     'foam.mlang.order.Comparator',
     'foam.mlang.predicate.Predicate',
     'foam.nanos.auth.AuthService',
+    'foam.nanos.auth.PriorPassword',
+    'foam.nanos.notification.Notification',
+    'foam.nanos.notification.NotificationSetting',
     'foam.util.SafetyUtil',
+    'java.util.List',
     'static foam.mlang.MLang.EQ'
   ],
 
@@ -70,6 +78,22 @@ foam.CLASS({
     }
   ],
 
+  sections: [
+    {
+      name: 'business',
+      title: 'Business Information'
+    },
+    {
+      name: 'personal',
+      title: 'Personal Information'
+    },
+    {
+      name: 'administrative',
+      help: 'Properties that are used internally by the system.',
+      permissionRequired: true
+    },
+  ],
+
   // TODO: The following properties don't have to be defined here anymore once
   // https://github.com/foam-framework/foam2/issues/1529 is fixed:
   //   1. enabled
@@ -85,60 +109,96 @@ foam.CLASS({
       name: 'id',
       documentation: 'The ID for the User.',
       final: true,
-      tableWidth: 50
-    },
+      tableWidth: 100,
+      createMode: 'HIDDEN',
+      updateMode: 'RO',
+      section: 'administrative',
+      includeInDigest: true
+   },
     {
       class: 'Boolean',
       name: 'enabled',
       documentation: 'Determines whether the User is permitted certain actions.',
-      value: true
+      value: true,
+      section: 'administrative'
     },
     {
       class: 'Boolean',
       name: 'loginEnabled',
       documentation: 'Determines whether the User can login to the platform.',
-      permissionRequired: true,
-      value: true
+      writePermissionRequired: true,
+      value: true,
+      section: 'administrative'
     },
     {
       class: 'DateTime',
       name: 'lastLogin',
-      documentation: 'The date and time of last login by User.'
+      documentation: 'The date and time of last login by User.',
+      section: 'administrative',
+      createMode: 'HIDDEN',
+      updateMode: 'RO'
     },
     {
       class: 'String',
       name: 'firstName',
       documentation: 'The first name of the User.',
+      // TODO: Use validatationPredicates instead.
       validateObj: function(firstName) {
-        if ( ! firstName.trim() ){
-          return 'First Name Required.'
-        } if ( firstName.length > 70 ) {
-          return 'First name cannot exceed 70 characters.';
-        } if( /\d/.test(this.firstName) ) {
-          return 'First name cannot contain numbers';
+        if ( ! firstName.trim() ) {
+          return 'First name required.';
         }
-      }
-    },
+      },
+      gridColumns: 4,
+      section: 'personal',
+      includeInDigest: true
+   },
     {
       class: 'String',
       name: 'middleName',
-      documentation: 'The middle name of the User.'
+      documentation: 'The middle name of the User.',
+      gridColumns: 4,
+      section: 'personal',
+      includeInDigest: true
     },
     {
       class: 'String',
       name: 'lastName',
       documentation: 'The last name of the User.',
+      // TODO: Use validatationPredicates instead.
       validateObj: function(lastName) {
-        if ( ! lastName.trim() ){
-          return 'Last Name Required.'
-        } if ( lastName.length > 70 ) {
-          return 'Last name cannot exceed 70 characters.';
-        } if( /\d/.test(this.lastName) ) {
-          return 'Last name cannot contain numbers';
+        if ( ! lastName.trim() ) {
+          return 'Last name required.';
         }
+      },
+      gridColumns: 4,
+      section: 'personal',
+      includeInDigest: true
+    },
+    {
+      name: 'legalName',
+      createMode: 'HIDDEN',
+      updateMode: 'RO',
+      section: 'personal'
+    },
+   {
+      class: 'String',
+      name: 'jobTitle',
+      section: 'personal',
+      view: function(args, X) {
+        return {
+          class: 'foam.u2.view.ChoiceWithOtherView',
+          otherKey: 'Other',
+          choiceView: {
+            class: 'foam.u2.view.ChoiceView',
+            placeholder: 'Please select...',
+            dao: X.jobTitleDAO,
+            objToChoice: function(a) {
+              return [a.name, a.label];
+            }
+          }
+        };
       }
     },
-    'legalName',
     {
       class: 'String',
       name: 'organization',
@@ -146,20 +206,16 @@ foam.CLASS({
       displayWidth: 80,
       width: 100,
       tableWidth: 160,
-      validateObj: function(organization) {
-        if ( organization.length > 70 ) {
-          return 'Company name cannot exceed 70 characters.';
-        } if (!(organization.trim())) {
-          return 'Company Name Required.';
-        }
-      }
+      section: 'business'
     },
     {
       class: 'String',
       name: 'department',
       documentation: `The department associated with the organization/business
         of the User.`,
-      width: 50
+      width: 50,
+      createMode: 'HIDDEN',
+      section: 'business'
     },
     {
       class: 'EMail',
@@ -171,45 +227,54 @@ foam.CLASS({
       preSet: function(_, val) {
         return val.toLowerCase();
       },
+      includeInDigest: true,
       javaSetter:
       `email_ = val.toLowerCase();
        emailIsSet_ = true;`,
-      validateObj: function (email) {
+      // TODO: Use validatationPredicates instead.
+      validateObj: function(email) {
         var emailRegex = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 
-        if (!(email.trim())) {
-          return 'Email Required.';
+        if ( ! email.trim() ) {
+          return 'Email required.';
         }
+
         if ( ! emailRegex.test(email.trim()) ) {
           return 'Invalid email address.';
         }
-      }
+      },
+      section: 'personal'
     },
     {
       class: 'Boolean',
       name: 'emailVerified',
       documentation: 'Determines whether the email address of the User is valid.',
-      permissionRequired: true
+      writePermissionRequired: true,
+      section: 'administrative'
     },
     {
       class: 'FObjectProperty',
       of: 'foam.nanos.auth.Phone',
       name: 'phone',
-      documentation: 'Returns the personal phone number of the User from the Phone model.',
+      documentation: 'Personal phone number.',
       factory: function() {
         return this.Phone.create();
       },
-      view: { class: 'foam.u2.detail.VerticalDetailView' }
+      view: { class: 'foam.u2.detail.VerticalDetailView' },
+      createMode: 'HIDDEN',
+      section: 'personal'
     },
     {
-      class: 'String',
+      class: 'PhoneNumber',
       name: 'phoneNumber',
-      transient: true,
-      documentation: `Omits properties of the phone number object and returns
-        the phone number.`,
-      expression: function(phone) {
-        return phone.number;
-      }
+      documentation: 'Personal phone number.',
+      section: 'personal'
+    },
+    {
+      class: 'Boolean',
+      name: 'phoneNumberVerified',
+      writePermissionRequired: true,
+      section: 'personal'
     },
     {
       class: 'FObjectProperty',
@@ -219,22 +284,46 @@ foam.CLASS({
       factory: function() {
         return this.Phone.create();
       },
-      view: { class: 'foam.u2.detail.VerticalDetailView' }
+      view: { class: 'foam.u2.detail.VerticalDetailView' },
+      section: 'personal',
+      createMode: 'HIDDEN',
+      includeInDigest: true
+    },
+    {
+      class: 'PhoneNumber',
+      name: 'mobileNumber',
+      documentation: 'Returns the mobile phone number of the User from the Phone model.',
+      createMode: 'HIDDEN',
+      section: 'personal'
+    },
+    {
+      class: 'Boolean',
+      name: 'mobileNumberVerified',
+      writePermissionRequired: true,
+      section: 'personal'
     },
     {
       class: 'String',
       name: 'type',
+      visibility: 'RO',
+      storageTransient: true,
       documentation: 'The type of the User.',
-      tableWidth: 91,
-      view: {
-        class: 'foam.u2.view.ChoiceView',
-        choices: [ 'Personal', 'Business', 'Merchant', 'Broker', 'Bank', 'Processor' ]
-      }
+      tableWidth: 75,
+      getter: function() {
+        return this.cls_.name;
+      },
+      javaGetter: `
+        return getClass().getSimpleName();
+      `,
+      createMode: 'HIDDEN',
+      updateMode: 'RO',
+      section: 'administrative'
     },
     {
       class: 'Date',
       name: 'birthday',
-      documentation: 'The date of birth of the individual person, or real user.'
+      documentation: 'The date of birth of the individual person, or real user.',
+      section: 'personal'
     },
     {
       class: 'foam.nanos.fs.FileProperty',
@@ -244,7 +333,8 @@ foam.CLASS({
       view: {
         class: 'foam.nanos.auth.ProfilePictureView',
         placeholderImage: 'images/ic-placeholder.png'
-      }
+      },
+      section: 'personal'
     },
     {
       class: 'FObjectProperty',
@@ -254,20 +344,24 @@ foam.CLASS({
       factory: function() {
         return this.Address.create();
       },
-      view: { class: 'foam.nanos.auth.AddressDetailView' }
+      section: 'personal'
     },
     {
       class: 'Reference',
       name: 'language',
       documentation: 'The default language preferred by the User.',
       of: 'foam.nanos.auth.Language',
-      value: 'en'
+      value: 'en',
+      createMode: 'HIDDEN',
+      section: 'personal'
     },
     {
       class: 'String',
       name: 'timeZone',
       documentation: 'The preferred time zone of the User.',
-      width: 5
+      width: 5,
+      createMode: 'HIDDEN',
+      section: 'personal'
       // TODO: create custom view or DAO
     },
     {
@@ -285,32 +379,60 @@ foam.CLASS({
         if ( password.length > 0 && ! re.test(password) ) {
           return 'Password must contain one lowercase letter, one uppercase letter, one digit, and be between 7 and 32 characters in length.';
         }
-      }
+      },
+      createMode: 'RW',
+      updateMode: 'HIDDEN',
+      readMode: 'HIDDEN',
+      section: 'personal'
     },
     {
       class: 'Password',
       name: 'password',
       documentation: 'The password that is currently active with the User.',
       hidden: true,
-      networkTransient: true
+      networkTransient: true,
+      section: 'administrative',
+      includeInDigest: true
+    },
+    {
+      name: 'passwordHistory',
+      class: 'FObjectArray',
+      of: 'foam.nanos.auth.PriorPassword',
+      javaFactory: `
+        foam.nanos.auth.PriorPassword[] priorPasswords = new foam.nanos.auth.PriorPassword[1];
+        priorPasswords[0] = new foam.nanos.auth.PriorPassword();
+        priorPasswords[0].setPassword(this.getPassword());
+        priorPasswords[0].setTimeStamp(new java.util.Date());
+        return priorPasswords;
+      `,
+      hidden: true,
+      networkTransient: true,
+      section: 'administrative',
+      createMode: 'HIDDEN',
+      updateMode: 'RO'
     },
     {
       class: 'Password',
       name: 'previousPassword',
       documentation: 'The password that was previously active with the User.',
       hidden: true,
-      networkTransient: true
+      networkTransient: true,
+      section: 'administrative'
     },
     {
       class: 'DateTime',
       name: 'passwordLastModified',
-      documentation: 'The date and time that the password was last modified.'
+      documentation: 'The date and time that the password was last modified.',
+      createMode: 'HIDDEN',
+      updateMode: 'RO',
+      section: 'administrative'
     },
     {
       class: 'DateTime',
       name: 'passwordExpiry',
       documentation: `The date and time that the current password of the User
         will expire.`,
+      section: 'administrative'
     },
     // TODO: startDate, endDate,
     // TODO: do we want to replace 'note' with a simple ticket system?
@@ -319,7 +441,8 @@ foam.CLASS({
       name: 'note',
       documentation: 'A field for a note that can be added and appended to the User.',
       displayWidth: 70,
-      view: { class: 'foam.u2.tag.TextArea', rows: 4, cols: 100 }
+      view: { class: 'foam.u2.tag.TextArea', rows: 4, cols: 100 },
+      section: 'administrative'
     },
     // TODO: remove after demo
     {
@@ -327,35 +450,22 @@ foam.CLASS({
       name: 'businessName',
       documentation: 'The name of the business associated with the User.',
       width: 50,
-      validateObj: function(businessName) {
-        if ( businessName.length > 35 ) {
-          return 'Business name cannot be greater than 35 characters.';
-        }
-      }
-    },
-    {
-      class: 'String',
-      name: 'bankIdentificationCode',
-      width: 20,
-      documentation: `The Bank Identification Code (BIC): an international bank code that
-      identifies particular banks worldwide.
-      `,
-    },
-    {
-      class: 'Boolean',
-      name: 'businessHoursEnabled',
-      documentation: 'Determines whether business hours are enabled for the User to set.',
-      value: false
+      section: 'business',
+      hidden: true
     },
     {
       class: 'StringArray',
       name: 'disabledTopics',
-      documentation: 'Disables types for notifications.'
+      documentation: 'Disables types for notifications.',
+      createMode: 'HIDDEN',
+      section: 'administrative'
     },
     {
       class: 'StringArray',
       name: 'disabledTopicsEmail',
-      documentation: 'Disables types for email notifications.'
+      documentation: 'Disables types for email notifications.',
+      createMode: 'HIDDEN',
+      section: 'administrative'
     },
     {
       class: 'URL',
@@ -369,17 +479,26 @@ foam.CLASS({
         if ( website.length > 0 && ! websiteRegex.test(website) ) {
           return 'Invalid website';
         }
-      }
+      },
+      createMode: 'HIDDEN',
+      section: 'personal'
     },
     {
       class: 'DateTime',
       name: 'created',
-      documentation: 'The date and time of when the User was created in the system.'
+      documentation: 'The date and time of when the User was created in the system.',
+      createMode: 'HIDDEN',
+      updateMode: 'RO',
+      section: 'administrative',
+      includeInDigest: true
     },
     {
       class: 'DateTime',
       name: 'lastModified',
-      documentation: 'The date and time the User was last modified.'
+      documentation: 'The date and time the User was last modified.',
+      createMode: 'HIDDEN',
+      updateMode: 'RO',
+      section: 'administrative'
     }
   ],
 
@@ -388,13 +507,18 @@ foam.CLASS({
       name: 'label',
       type: 'String',
       code: function label() {
-        return this.organization || this.businessName || ( this.lastName ? this.firstName + ' ' + this.lastName : this.firstName );
+        if ( this.legalName ) return this.legalName;
+        if ( this.lastName && this.firstName ) return this.firstName + ' ' + this.lastName;
+        if ( this.lastName ) return this.lastName;
+        if ( this.firstName ) return this.firstName;
+        return '';
       },
       javaCode: `
-        if ( ! SafetyUtil.isEmpty(getOrganization()) ) return getOrganization();
-        if ( ! SafetyUtil.isEmpty(getBusinessName()) ) return getBusinessName();
-        if ( SafetyUtil.isEmpty(getLastName()) ) return getFirstName();
-        return getFirstName() + " " + getLastName();
+        if ( ! SafetyUtil.isEmpty(this.getLegalName()) ) return this.getLegalName();
+        if ( ! SafetyUtil.isEmpty(this.getLastName()) && ! SafetyUtil.isEmpty(this.getFirstName()) ) return this.getFirstName() + " " + this.getLastName();
+        if ( ! SafetyUtil.isEmpty(this.getLastName()) ) return this.getLastName();
+        if ( ! SafetyUtil.isEmpty(this.getFirstName()) ) return this.getFirstName();
+        return "";
       `
     },
     {
@@ -506,6 +630,15 @@ foam.CLASS({
       code: function() {
         return this.label();
       }
+    },
+    {
+      name: 'doNotify',
+      javaCode: `
+        List<NotificationSetting> settings = ((ArraySink) getNotificationSettings(x).select(new ArraySink())).getArray();
+        for( NotificationSetting setting : settings ) {
+          setting.sendNotification(x, this, notification);
+        }
+      `
     }
   ]
 });
@@ -521,7 +654,8 @@ foam.RELATIONSHIP({
     hidden: true
   },
   targetProperty: {
-    hidden: false
+    hidden: false,
+    section: 'administrative'
   }
 });
 
@@ -548,7 +682,8 @@ foam.RELATIONSHIP({
   },
   targetProperty: {
     hidden: false,
-    tableWidth: 120
+    tableWidth: 120,
+    section: 'administrative'
   }
 });
 
@@ -560,6 +695,14 @@ foam.RELATIONSHIP({
   forwardName: 'entities',
   inverseName: 'agents',
   junctionDAOKey: 'agentJunctionDAO',
+  sourceProperty: {
+    createMode: 'HIDDEN',
+    section: 'business'
+  },
+  targetProperty: {
+    createMode: 'HIDDEN',
+    section: 'business'
+  }
 });
 
 foam.CLASS({

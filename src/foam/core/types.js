@@ -100,7 +100,10 @@ foam.CLASS({
         if ( typeof d === 'string' ) {
           var ret = new Date(d);
 
-          if ( isNaN(ret.getTime()) ) throw 'Invalid Date: ' + d;
+          if ( isNaN(ret.getTime()) ) {
+            ret = new Date((Number.MAX_SAFE_INTEGER || Number.MAX_VALUE) * 0.9);
+            console.warn("Invalid date: " + d + "; assuming "+ret.toISOString()+".");
+          }
 
           return ret;
         }
@@ -479,8 +482,25 @@ foam.CLASS({
 
 foam.CLASS({
   package: 'foam.core',
-  name: 'Currency',
-  extends: 'Long'
+  name: 'Code',
+  extends: 'String'
+});
+
+
+foam.CLASS({
+  package: 'foam.core',
+  name: 'UnitValue',
+  extends: 'Long',
+  properties: [
+    {
+      class: 'String',
+      name: 'unitPropName',
+      value: 'denomination',
+      documentation: `
+        The name of the property of a model that contains the denomination String.
+      `
+    }
+  ]
 });
 
 

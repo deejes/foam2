@@ -12,6 +12,8 @@ foam.CLASS({
   css: `
     ^tr {
       background: white;
+      border-left: 1px solid /*%GREY4%*/ #e7eaec;
+      border-right: 1px solid /*%GREY4%*/ #e7eaec;
       border-bottom: 1px solid /*%GREY4%*/ #e7eaec;
       display: flex;
       height: 48px;
@@ -23,7 +25,6 @@ foam.CLASS({
     }
 
     ^thead {
-      border: 1px solid /*%GREY4%*/ #e7eaec;
       border-radius: 5px;
       box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08);
       overflow: hidden;
@@ -74,6 +75,10 @@ foam.CLASS({
 
     ^ .disabled {
       color: #aaa;
+    }
+
+    ^td .foam-u2-ActionView {
+      padding: 4px 12px;
     }
   `,
 });

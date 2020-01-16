@@ -5,6 +5,7 @@
  */
 
 foam.CLASS({
+  package: 'com.google.foam.demos.u2',
   name: 'AllViews',
 
   properties: [
@@ -216,7 +217,7 @@ foam.CLASS({
       name: 'defaultPhoneNumber'
     },
     {
-      class: 'Currency',
+      class: 'UnitValue',
       name: 'defaultCurrency'
     },
     {
@@ -261,6 +262,10 @@ foam.CLASS({
           [ 'foam.nanos.menu.TabsMenu', 'Tabs'    ]
         ]
       }
+    },
+    {
+      class: 'Map',
+      name: 'map'
     }
   ]
 })

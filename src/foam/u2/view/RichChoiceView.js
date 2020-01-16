@@ -6,6 +6,42 @@
 
 foam.CLASS({
   package: 'foam.u2.view',
+  name: 'RichChoiceViewSection',
+
+  documentation: 'Models one section of the dropdown for a RichChoiceView.',
+
+  properties: [
+    {
+      class: 'foam.dao.DAOProperty',
+      name: 'dao',
+      documentation: 'The DAO that will be used to populate the options in this section.'
+    },
+    {
+      class: 'foam.dao.DAOProperty',
+      name: 'filteredDAO',
+      documentation: 'A filtered version of the underlying DAO, depending on the search term the user has typed in.',
+      factory: function() { return this.dao; }
+    },
+    {
+      class: 'Boolean',
+      name: 'hideIfEmpty',
+      documentation: 'This section will be hidden if there are no items in it if this is set to true.'
+    },
+    {
+      class: 'Boolean',
+      name: 'disabled',
+      documentation: 'Rows in this section will not be selectable if this is set to true.'
+    },
+    {
+      class: 'String',
+      name: 'heading',
+      documentation: 'The heading text for this section.'
+    }
+  ]
+});
+
+foam.CLASS({
+  package: 'foam.u2.view',
   name: 'RichChoiceView',
   extends: 'foam.u2.View',
 
@@ -56,12 +92,15 @@ foam.CLASS({
     ^ {
       display: inline-block;
       position: relative;
+    }
+
+    ^setAbove {
       z-index: 1;
     }
 
     ^container {
       position: absolute;
-      bottom: 0;
+      bottom: -4px;
       left: 0;
       transform: translateY(100%);
       background: white;
@@ -71,7 +110,8 @@ foam.CLASS({
       box-sizing: border-box;
       width: 100%;
       min-width: fit-content;
-      -webkit-appearance: textfield;
+      border-radius: 3px;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 2px 8px 0 rgba(0, 0, 0, 0.16);
     }
 
     ^heading {
@@ -82,16 +122,22 @@ foam.CLASS({
     }
 
     ^selection-view {
-      background-color: white;
       display: inline-flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 11px;
+      width: 100%;
+
+      height: /*%INPUTHEIGHT%*/ 32px;
+      font-size: 14px;
+      padding-left: %INPUTHORIZONTALPADDING%;
+      padding-right: %INPUTHORIZONTALPADDING%;
+      border: 1px solid;
+      border-radius: 3px;
+      color: /*%BLACK%*/ #1e1f21;
+      background-color: white;
+      border-color: /*%GREY3%*/ #cbcfd4;
       box-sizing: border-box;
-      -webkit-appearance: textfield;
-      padding: 1px 2px;
       cursor: default;
-      border: 1px solid /*%GREY3%*/ #cbcfd4;
       min-width: 94px;
     }
 
@@ -116,29 +162,26 @@ foam.CLASS({
       flex-grow: 1;
     }
 
+    ^ .search .property-filter_ {
+      width: 100%;
+    }
+
     ^ .search input {
       width: 100%;
       border: none;
-      border-bottom: 1px solid #f4f4f9;
-    }
-
-    ^ .search input:focus {
-      border: none;
+      padding-left: %INPUTHORIZONTALPADDING%;
+      padding-right: %INPUTHORIZONTALPADDING%;
+      height: /*%INPUTHEIGHT%*/ 32px;
     }
 
     ^ .search img {
       width: 15px;
-      position: absolute;
-      left: 10px;
-      top: 13px;
+      margin-left: 8px;
     }
 
     ^ .search {
       border-bottom: 1px solid #f4f4f9;
-    }
-
-    ^ .property-filter_ {
-      padding-left: 25px;
+      display: flex;
     }
 
     ^ .disabled {
@@ -194,15 +237,13 @@ foam.CLASS({
       }
     },
     {
-      class: 'Array',
+      class: 'FObjectArray',
+      of: 'foam.u2.view.RichChoiceViewSection',
       name: 'sections',
       documentation: `
         This lets you pass different predicated versions of a dao in different
         sections, which can be used to do things like grouping by some property
         for each section.
-        Each object in the array must have a 'label' property of type string
-        which will be used for the section heading, and a 'dao' property of type
-        DAO that will be used to populate the list in that section.
       `,
     },
     {
@@ -231,12 +272,10 @@ foam.CLASS({
       name: 'filter_',
       documentation: 'The text that the user typed in to search by.',
       postSet: function(oldValue, newValue) {
-        this.sections = this.sections.map((section) => {
-          return Object.assign({}, section, {
-            filtered: newValue
-              ? section.dao.where(this.KEYWORD(newValue))
-              : section.dao
-          });
+        this.sections.forEach((section) => {
+          section.filteredDAO = newValue
+            ? section.dao.where(this.KEYWORD(newValue))
+            : section.dao;
         });
       }
     },
@@ -338,13 +377,13 @@ foam.CLASS({
                   return Promise.all(promiseArray).then((resp) => {
                     var index = 0;
                     return this.E().forEach(sections, function(section) {
-                      this
+                      this.addClass(self.myClass('setAbove'))
                         .start().hide(!! section.hideIfEmpty && resp[index].value <= 0 || ! section.heading)
                           .addClass(self.myClass('heading'))
                           .add(section.heading)
                         .end()
                         .start()
-                          .select(section.filtered || section.dao, (obj) => {
+                          .select(section.filteredDAO$proxy, (obj) => {
                             return this.E()
                               .start(self.rowView, { data: obj })
                                 .enableClass('disabled', section.disabled)

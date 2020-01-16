@@ -72,6 +72,14 @@ foam.CLASS({
     {
       class: 'String',
       name: 'supportEmail'
+    },
+    {
+      class: 'String',
+      name: 'defaultSpid'
+    },
+    {
+      class: 'String',
+      name: 'externalUrl'
     }
   ]
 });

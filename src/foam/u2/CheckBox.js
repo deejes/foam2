@@ -56,6 +56,7 @@ foam.CLASS({
                       this.labelFormatter,
                       function() { this.add(self.label$); })
           .on('click', function() {
+            if ( self.getAttribute('disabled') ) return;
             this.data = ! this.data;
           }.bind(this))
         .end();
@@ -75,7 +76,7 @@ foam.CLASS({
 
   css: `
     ^ {
-      margin: 4px;
+      margin: 0;
       padding: 8px;
     }
 
